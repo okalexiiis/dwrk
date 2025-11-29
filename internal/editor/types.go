@@ -111,6 +111,44 @@ func (n *Nano) IsAvailable() bool {
 	return err == nil
 }
 
+// =======================================
+// Terminal
+// =======================================
+type Terminal struct{}
+
+func NewTerminal() *Terminal {
+	return &Terminal{}
+}
+
+func (t *Terminal) Name() string {
+	return "Terminal"
+}
+
+func (t *Terminal) Open(projectPath string) error {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+
+	cmd := exec.Command(shell)
+	cmd.Dir = projectPath
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func (t *Terminal) IsAvailable() bool {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+
+	_, err := exec.LookPath(shell)
+	return err == nil
+}
+
 // ============================================
 // Tmux
 // ============================================

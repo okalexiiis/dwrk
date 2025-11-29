@@ -54,5 +54,5 @@ func runNew(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("\n💡 Para abrir el proyecto:\n")
-	fmt.Printf("   proj open %s\n", projectName)
+	fmt.Printf("   dwrk open %s\n", projectName)
 }

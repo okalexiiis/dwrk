@@ -1,6 +1,3 @@
-// ============================================
-// cmd/clone/clone.go
-// ============================================
 package clone
 
 import (
@@ -31,11 +28,11 @@ var CloneCmd = &cobra.Command{
 	Long: `Clona un repositorio de GitHub en el directorio de proyectos.
 
 Ejemplos:
-  proj clone my-repo                    # Clona tu repo con SSH
-  proj clone my-repo --https            # Clona tu repo con HTTPS
-  proj clone my-repo -u otro-usuario    # Clona repo de otro usuario
-  proj clone --url https://github.com/user/repo.git  # Clona URL específica
-  proj clone my-repo --dir ~/Otros      # Clona en directorio diferente`,
+  dwrk clone my-repo                    # Clona tu repo con SSH
+  dwrk clone my-repo --https            # Clona tu repo con HTTPS
+  dwrk clone my-repo -u otro-usuario    # Clona repo de otro usuario
+  dwrk clone --url https://github.com/user/repo.git  # Clona URL específica
+  dwrk clone my-repo --dir ~/Otros      # Clona en directorio diferente`,
 	Args: cobra.MaximumNArgs(1),
 	Run:  runClone,
 }
@@ -55,20 +52,20 @@ func runClone(cmd *cobra.Command, args []string) {
 	if url != "" {
 		// Caso 1: URL completa proporcionada
 		repoURL = url
-		repoName = extractRepoName(url)
+		repoName = utils.ExtractRepoName(url)
 		fmt.Printf("🔗 Clonando desde URL: %s\n", repoURL)
 	} else {
 		// Caso 2: Construir URL desde nombre de repo
 		if len(args) == 0 {
 			fmt.Fprintln(os.Stderr, "❌ Error: debes proporcionar un nombre de repositorio o usar --url")
 			fmt.Println("\n💡 Ejemplos:")
-			fmt.Println("   proj clone my-repo")
-			fmt.Println("   proj clone --url https://github.com/user/repo.git")
+			fmt.Println("   dwrk clone my-repo")
+			fmt.Println("   dwrk clone --url https://github.com/user/repo.git")
 			os.Exit(1)
 		}
 
 		repoName = args[0]
-		repoURL = buildRepoURL(username, repoName, useHTTPS)
+		repoURL = utils.BuildRepoURL(username, repoName, useHTTPS)
 
 		protocol := "SSH"
 		if useHTTPS {
@@ -118,27 +115,5 @@ func runClone(cmd *cobra.Command, args []string) {
 	fmt.Printf("✅ Repositorio clonado exitosamente\n")
 	fmt.Printf("📁 Ubicación: %s\n", clonedPath)
 	fmt.Printf("\n💡 Para abrir el proyecto:\n")
-	fmt.Printf("   proj open %s\n", repoName)
-}
-
-// buildRepoURL construye la URL del repositorio según el protocolo
-func buildRepoURL(user, repo string, https bool) string {
-	if https {
-		return fmt.Sprintf("https://github.com/%s/%s.git", user, repo)
-	}
-	return fmt.Sprintf("git@github.com:%s/%s.git", user, repo)
-}
-
-// extractRepoName extrae el nombre del repositorio de una URL
-func extractRepoName(url string) string {
-	// Eliminar .git del final si existe
-	url = strings.TrimSuffix(url, ".git")
-
-	// Extraer última parte de la URL
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-
-	return "cloned-repo"
+	fmt.Printf("   dwrk open %s\n", repoName)
 }

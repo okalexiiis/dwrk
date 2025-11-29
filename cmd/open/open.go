@@ -41,35 +41,47 @@ func runOpen(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 		fmt.Println("\n💡 Lista de proyectos disponibles:")
-		fmt.Println("   proj list")
+		fmt.Println("   dwrk list")
 		os.Exit(1)
 	}
 
-	// Determinar qué editor usar
-	var selectedEditor editor.Editor
-
+	// Determinar qué hacer según los flags
 	if tmuxFlag {
-		selectedEditor = editor.NewTmux()
-	} else if editorFlag != "" {
-		// Usar el editor especificado en el flag
-		selectedEditor, err = editor.GetEditor(editorFlag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			fmt.Println("\n📝 Editores disponibles: code, nvim, vim, nano")
+		// Abrir en tmux
+		selectedEditor := editor.NewTmux()
+		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
+
+		if err := selectedEditor.Open(proj.Path); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error al abrir proyecto: %v\n", err)
 			os.Exit(1)
 		}
+
+		fmt.Printf("✅ Proyecto abierto exitosamente\n")
+	} else if editorFlag != "" {
+		// Usar el editor especificado en el flag
+		selectedEditor, err := editor.GetEditor(editorFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			fmt.Println("\n📝 Editores disponibles: code, nvim, vim, nano, terminal")
+			os.Exit(1)
+		}
+
+		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
+
+		if err := selectedEditor.Open(proj.Path); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error al abrir proyecto: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✅ Proyecto abierto exitosamente\n")
 	} else {
-		// Usar editor por defecto (detectado automáticamente)
-		selectedEditor = editor.GetDefault()
+		// Comportamiento por defecto: abrir shell en el directorio
+		fmt.Printf("📁 Cambiando a directorio del proyecto '%s'...\n", projectName)
+
+		terminal := editor.NewTerminal()
+		if err := terminal.Open(proj.Path); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error al abrir directorio: %v\n", err)
+			os.Exit(1)
+		}
 	}
-
-	// Abrir el proyecto
-	fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
-
-	if err := selectedEditor.Open(proj.Path); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error al abrir proyecto: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("✅ Proyecto abierto exitosamente\n")
 }
