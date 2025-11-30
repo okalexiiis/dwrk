@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/okalexiiis/dwrk/internal/config"
 	"github.com/okalexiiis/dwrk/internal/project"
 	"github.com/okalexiiis/dwrk/pkg/utils"
 	"github.com/spf13/cobra"
 )
-
-var PROJECTS_DIR = "~/Projects/"
 
 // flags
 var (
@@ -29,8 +28,11 @@ func init() {
 }
 
 func runNew(cmd *cobra.Command, args []string) {
+	// Load the config
+	cfg, err := config.Load()
+
 	projectName := args[0]
-	projectsDir := utils.ExpandPath(PROJECTS_DIR)
+	projectsDir := utils.ExpandPath(cfg.ProjectsDir)
 
 	// Crear manager
 	manager := project.NewManager(projectsDir)

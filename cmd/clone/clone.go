@@ -3,16 +3,15 @@ package clone
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/okalexiiis/dwrk/internal/config"
 	"github.com/okalexiiis/dwrk/internal/git"
 	"github.com/okalexiiis/dwrk/internal/project"
 	"github.com/okalexiiis/dwrk/pkg/utils"
 	"github.com/spf13/cobra"
 )
-
-var PROJECTS_DIR = "~/Projects/"
-var DEFAULT_USERNAME = "okalexiiis"
 
 // flags
 var (
@@ -25,46 +24,76 @@ var (
 var CloneCmd = &cobra.Command{
 	Use:   "clone <repo>",
 	Short: "Clona un repositorio de GitHub",
-	Long: `Clona un repositorio de GitHub en el directorio de proyectos.
-
-Ejemplos:
-  dwrk clone my-repo                    # Clona tu repo con SSH
-  dwrk clone my-repo --https            # Clona tu repo con HTTPS
-  dwrk clone my-repo -u otro-usuario    # Clona repo de otro usuario
-  dwrk clone --url https://github.com/user/repo.git  # Clona URL específica
-  dwrk clone my-repo --dir ~/Otros      # Clona en directorio diferente`,
-	Args: cobra.MaximumNArgs(1),
-	Run:  runClone,
+	Args:  cobra.MaximumNArgs(1),
+	Run:   runClone,
 }
 
 func init() {
-	CloneCmd.Flags().StringVarP(&username, "user", "u", DEFAULT_USERNAME, "Usuario de GitHub")
-	CloneCmd.Flags().StringVar(&url, "url", "", "URL completa del repositorio (ignora otras flags)")
+	CloneCmd.Flags().StringVarP(&username, "user", "u", "", "Usuario de GitHub (por defecto: de config)")
+	CloneCmd.Flags().StringVar(&url, "url", "", "URL completa del repositorio")
 	CloneCmd.Flags().BoolVar(&useHTTPS, "https", false, "Usar HTTPS en lugar de SSH")
-	CloneCmd.Flags().StringVar(&destDir, "dir", "", "Directorio destino (por defecto: PROJECTS_DIR)")
+	CloneCmd.Flags().StringVar(&destDir, "dir", "", "Directorio destino")
 }
 
 func runClone(cmd *cobra.Command, args []string) {
+	// Cargar configuración
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error cargando configuración: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Usar username de config si no se especificó
+	if username == "" {
+		username = cfg.GitHubUsername
+	}
+
+	// Usar preferencia de SSH/HTTPS de config si no se especificó
+	if !cmd.Flags().Changed("https") {
+		useHTTPS = !cfg.UseSSH
+	}
+
 	var repoURL string
 	var repoName string
 
-	// Determinar la URL del repositorio
 	if url != "" {
-		// Caso 1: URL completa proporcionada
 		repoURL = url
 		repoName = utils.ExtractRepoName(url)
 		fmt.Printf("🔗 Clonando desde URL: %s\n", repoURL)
 	} else {
-		// Caso 2: Construir URL desde nombre de repo
 		if len(args) == 0 {
 			fmt.Fprintln(os.Stderr, "❌ Error: debes proporcionar un nombre de repositorio o usar --url")
-			fmt.Println("\n💡 Ejemplos:")
-			fmt.Println("   dwrk clone my-repo")
-			fmt.Println("   dwrk clone --url https://github.com/user/repo.git")
 			os.Exit(1)
 		}
 
 		repoName = args[0]
+
+		// Usar PROJECTS_DIR de config
+		projectsPath := cfg.ProjectsDir
+		manager := project.NewManager(projectsPath)
+
+		if destDir == "" {
+			if manager.Exists(repoName) {
+				destDir = filepath.Join(cfg.ProjectsDir, repoName)
+				fmt.Printf("📁 Encontrado proyecto local '%s'\n", repoName)
+				fmt.Printf("📥 Clonando dentro de: %s\n", destDir)
+			} else {
+				fmt.Printf("⚠️  No existe un proyecto local llamado '%s'\n", repoName)
+				fmt.Print("¿Deseas clonar en PROJECTS_DIR y crear el directorio? [Y/n]: ")
+
+				var response string
+				fmt.Scanln(&response)
+
+				response = strings.ToLower(strings.TrimSpace(response))
+				if response == "n" || response == "no" {
+					fmt.Println("❌ Operación cancelada")
+					os.Exit(0)
+				}
+
+				destDir = cfg.ProjectsDir
+			}
+		}
+
 		repoURL = utils.BuildRepoURL(username, repoName, useHTTPS)
 
 		protocol := "SSH"
@@ -74,44 +103,20 @@ func runClone(cmd *cobra.Command, args []string) {
 		fmt.Printf("🔗 Clonando %s/%s (%s)...\n", username, repoName, protocol)
 	}
 
-	// Determinar directorio destino
-	targetDir := PROJECTS_DIR
-	if destDir != "" {
-		targetDir = destDir
-	}
-	targetPath := utils.ExpandPath(targetDir)
+	targetPath := utils.ExpandPath(destDir)
 
-	// Verificar que no exista ya el proyecto
-	manager := project.NewManager(targetPath)
-	if manager.Exists(repoName) {
-		fmt.Fprintf(os.Stderr, "❌ Error: ya existe un proyecto con el nombre '%s'\n", repoName)
-		fmt.Printf("📁 Ubicación: %s/%s\n", targetPath, repoName)
-		fmt.Println("\n💡 Usa --dir para clonar en otra ubicación")
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error: no se pudo crear el directorio destino: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Clonar el repositorio
 	cloner := git.NewCloner()
 	clonedPath, err := cloner.Clone(repoURL, targetPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error al clonar repositorio: %v\n", err)
-
-		// Sugerencias según el tipo de error
-		if strings.Contains(err.Error(), "Permission denied") {
-			fmt.Println("\n💡 Si usas SSH, verifica que tu clave esté configurada:")
-			fmt.Println("   ssh -T git@github.com")
-			fmt.Println("   O intenta con HTTPS: --https")
-		} else if strings.Contains(err.Error(), "Repository not found") {
-			fmt.Println("\n💡 Verifica que:")
-			fmt.Println("   - El repositorio existe")
-			fmt.Println("   - Tienes permisos de acceso")
-			fmt.Println("   - El nombre de usuario es correcto")
-		}
-
 		os.Exit(1)
 	}
 
-	// Éxito
 	fmt.Printf("✅ Repositorio clonado exitosamente\n")
 	fmt.Printf("📁 Ubicación: %s\n", clonedPath)
 	fmt.Printf("\n💡 Para abrir el proyecto:\n")

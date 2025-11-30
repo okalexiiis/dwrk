@@ -2,6 +2,8 @@ package utils
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,4 +27,14 @@ func BuildRepoURL(user, repo string, https bool) string {
 		return fmt.Sprintf("https://github.com/%s/%s.git", user, repo)
 	}
 	return fmt.Sprintf("git@github.com:%s/%s.git", user, repo)
+}
+
+// isGitRepo verifica si un directorio es un repositorio git
+func IsGitRepo(path string) bool {
+	gitPath := filepath.Join(path, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }

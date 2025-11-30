@@ -3,16 +3,14 @@ package open
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
+	"github.com/okalexiiis/dwrk/internal/config"
 	"github.com/okalexiiis/dwrk/internal/editor"
 	"github.com/okalexiiis/dwrk/internal/project"
-	"github.com/okalexiiis/dwrk/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
-var PROJECTS_DIR = "~/Projects/"
-
-// flags
 var (
 	editorFlag string
 	tmuxFlag   bool
@@ -20,23 +18,28 @@ var (
 
 var OpenCmd = &cobra.Command{
 	Use:   "open <nombre>",
-	Short: "Abre un proyecto en el editor configurado",
-	Long:  "Abre un proyecto existente en el editor de tu elección (VSCode, Neovim, etc.) o en una sesión tmux.",
+	Short: "Abre un proyecto",
 	Args:  cobra.ExactArgs(1),
 	Run:   runOpen,
 }
 
 func init() {
-	OpenCmd.Flags().StringVarP(&editorFlag, "editor", "e", "", "Editor a usar (code, nvim, vim, nano)")
-	OpenCmd.Flags().BoolVarP(&tmuxFlag, "tmux", "t", false, "Abrir en sesión tmux")
+	OpenCmd.Flags().StringVarP(&editorFlag, "editor", "e", "", "Editor a usar")
+	OpenCmd.Flags().BoolVarP(&tmuxFlag, "tmux", "t", false, "Abrir en tmux")
 }
 
 func runOpen(cmd *cobra.Command, args []string) {
 	projectName := args[0]
-	projectsDir := utils.ExpandPath(PROJECTS_DIR)
+
+	// Cargar configuración
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error cargando configuración: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Verificar que el proyecto existe
-	manager := project.NewManager(projectsDir)
+	manager := project.NewManager(cfg.ProjectsDir)
 	proj, err := manager.Get(projectName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -45,42 +48,48 @@ func runOpen(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Determinar qué hacer según los flags
+	// Determinar editor a usar
+	selectedEditorName := editorFlag
+	if selectedEditorName == "" && !tmuxFlag {
+		selectedEditorName = cfg.DefaultEditor
+	}
+
 	if tmuxFlag {
-		// Abrir en tmux
 		selectedEditor := editor.NewTmux()
 		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
-
 		if err := selectedEditor.Open(proj.Path); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error al abrir proyecto: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-
 		fmt.Printf("✅ Proyecto abierto exitosamente\n")
-	} else if editorFlag != "" {
-		// Usar el editor especificado en el flag
-		selectedEditor, err := editor.GetEditor(editorFlag)
+	} else if selectedEditorName != "" && selectedEditorName != "auto" {
+		selectedEditor, err := editor.GetEditor(selectedEditorName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			fmt.Println("\n📝 Editores disponibles: code, nvim, vim, nano, terminal")
 			os.Exit(1)
 		}
 
 		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
-
 		if err := selectedEditor.Open(proj.Path); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error al abrir proyecto: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-
 		fmt.Printf("✅ Proyecto abierto exitosamente\n")
 	} else {
-		// Comportamiento por defecto: abrir shell en el directorio
-		fmt.Printf("📁 Cambiando a directorio del proyecto '%s'...\n", projectName)
-
-		terminal := editor.NewTerminal()
-		if err := terminal.Open(proj.Path); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error al abrir directorio: %v\n", err)
+		// Default: abrir shell
+		fmt.Printf("📁 Abriendo shell en '%s'...\n", projectName)
+		shell := os.Getenv("SHELL")
+		if shell == "" {
+			shell = "/bin/bash"
+		}
+		cmd := exec.Command(shell)
+		cmd.Dir = proj.Path
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", proj.Path))
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 	}
