@@ -17,38 +17,38 @@ var (
 )
 
 var OpenCmd = &cobra.Command{
-	Use:   "open <nombre>",
-	Short: "Abre un proyecto",
+	Use:   "open <name>",
+	Short: "Open a project",
 	Args:  cobra.ExactArgs(1),
 	Run:   runOpen,
 }
 
 func init() {
-	OpenCmd.Flags().StringVarP(&editorFlag, "editor", "e", "", "Editor a usar")
-	OpenCmd.Flags().BoolVarP(&tmuxFlag, "tmux", "t", false, "Abrir en tmux")
+	OpenCmd.Flags().StringVarP(&editorFlag, "editor", "e", "", "Editor to use")
+	OpenCmd.Flags().BoolVarP(&tmuxFlag, "tmux", "t", false, "Open the project in tmux")
 }
 
 func runOpen(cmd *cobra.Command, args []string) {
 	projectName := args[0]
 
-	// Cargar configuración
+	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error cargando configuración: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Verificar que el proyecto existe
+	// Ensure the project exists
 	manager := project.NewManager(cfg.ProjectsDir)
 	proj, err := manager.Get(projectName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-		fmt.Println("\n💡 Lista de proyectos disponibles:")
-		fmt.Println("   dwrk list")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Println("\nAvailable projects:")
+		fmt.Println("  dwrk list")
 		os.Exit(1)
 	}
 
-	// Determinar editor a usar
+	// Determine which editor to use
 	selectedEditorName := editorFlag
 	if selectedEditorName == "" && !tmuxFlag {
 		selectedEditorName = cfg.DefaultEditor
@@ -56,41 +56,52 @@ func runOpen(cmd *cobra.Command, args []string) {
 
 	if tmuxFlag {
 		selectedEditor := editor.NewTmux()
-		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
+		fmt.Printf("Opening '%s' with %s...\n", projectName, selectedEditor.Name())
+
 		if err := selectedEditor.Open(proj.Path); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("✅ Proyecto abierto exitosamente\n")
-	} else if selectedEditorName != "" && selectedEditorName != "auto" {
-		selectedEditor, err := editor.GetEditor(selectedEditorName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("🚀 Abriendo '%s' con %s...\n", projectName, selectedEditor.Name())
+		fmt.Println("Project opened successfully")
+		return
+	}
+
+	if selectedEditorName != "" && selectedEditorName != "auto" {
+		selectedEditor, err := editor.GetEditor(selectedEditorName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Opening '%s' with %s...\n", projectName, selectedEditor.Name())
+
 		if err := selectedEditor.Open(proj.Path); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("✅ Proyecto abierto exitosamente\n")
-	} else {
-		// Default: abrir shell
-		fmt.Printf("📁 Abriendo shell en '%s'...\n", projectName)
-		shell := os.Getenv("SHELL")
-		if shell == "" {
-			shell = "/bin/bash"
-		}
-		cmd := exec.Command(shell)
-		cmd.Dir = proj.Path
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", proj.Path))
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
-		}
+
+		fmt.Println("Project opened successfully")
+		return
+	}
+
+	// Default: open a shell session
+	fmt.Printf("Opening shell in '%s'...\n", projectName)
+
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+
+	command := exec.Command(shell)
+	command.Dir = proj.Path
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	command.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", proj.Path))
+
+	if err := command.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }

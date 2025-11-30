@@ -9,20 +9,24 @@ import (
 	"time"
 )
 
+// Manager handles project discovery, creation, and metadata retrieval.
 type Manager struct {
 	baseDir string
 }
 
+// ListOptions defines filtering options for the List method.
 type ListOptions struct {
-	ShowHidden bool
-	Filter     string
-	Search     string
+	ShowHidden bool   // Include directories starting with a dot
+	Filter     string // Substring filter applied to project names
+	Search     string // Future extension for fuzzy search or advanced matching
 }
 
+// CreateOptions defines optional behaviors when creating a project.
 type CreateOptions struct {
-	InitGit bool
+	InitGit bool // Initialize a Git repository after creating the folder
 }
 
+// Project describes a project discovered or created by the Manager.
 type Project struct {
 	Name    string
 	Path    string
@@ -30,11 +34,15 @@ type Project struct {
 	LastMod time.Time
 }
 
+// NewManager creates a new Manager using the provided base directory.
 func NewManager(baseDir string) *Manager {
 	return &Manager{baseDir: baseDir}
 }
 
-// List lista todos los proyectos
+// List returns all projects under the base directory, applying the given filters.
+//
+// A project is any non-hidden directory unless ShowHidden is enabled.
+// Git repositories are automatically detected.
 func (m *Manager) List(opts ListOptions) ([]Project, error) {
 	entries, err := os.ReadDir(m.baseDir)
 	if err != nil {
@@ -42,6 +50,7 @@ func (m *Manager) List(opts ListOptions) ([]Project, error) {
 	}
 
 	var projects []Project
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -53,7 +62,8 @@ func (m *Manager) List(opts ListOptions) ([]Project, error) {
 			continue
 		}
 
-		if opts.Filter != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(opts.Filter)) {
+		if opts.Filter != "" &&
+			!strings.Contains(strings.ToLower(name), strings.ToLower(opts.Filter)) {
 			continue
 		}
 
@@ -71,36 +81,33 @@ func (m *Manager) List(opts ListOptions) ([]Project, error) {
 	return projects, nil
 }
 
-// Create crea un nuevo proyecto
+// Create creates a new project directory and optionally initializes a Git repository.
+//
+// The name is validated to avoid invalid or unsafe folder names.
+// If Git initialization fails, the created directory is removed to maintain consistency.
 func (m *Manager) Create(name string, opts CreateOptions) (*Project, error) {
-	// 1. Validar nombre del proyecto
 	if err := validateProjectName(name); err != nil {
 		return nil, err
 	}
 
-	// 2. Verificar si ya existe
 	if m.Exists(name) {
-		return nil, fmt.Errorf("ya existe un proyecto con el nombre '%s'", name)
+		return nil, fmt.Errorf("a project named '%s' already exists", name)
 	}
 
-	// 3. Crear el directorio del proyecto
 	projectPath := filepath.Join(m.baseDir, name)
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
-		return nil, fmt.Errorf("error al crear directorio: %w", err)
+		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// 4. Inicializar git si se solicita
 	isGit := false
 	if opts.InitGit {
 		if err := initGitRepo(projectPath, name); err != nil {
-			// Intentamos limpiar si falla
 			os.RemoveAll(projectPath)
-			return nil, fmt.Errorf("error al inicializar git: %w", err)
+			return nil, fmt.Errorf("failed to initialize git: %w", err)
 		}
 		isGit = true
 	}
 
-	// 5. Retornar el proyecto creado
 	return &Project{
 		Name:    name,
 		Path:    projectPath,
@@ -109,7 +116,7 @@ func (m *Manager) Create(name string, opts CreateOptions) (*Project, error) {
 	}, nil
 }
 
-// Exists verifica si un proyecto existe
+// Exists checks whether a project with the given name exists.
 func (m *Manager) Exists(name string) bool {
 	projectPath := filepath.Join(m.baseDir, name)
 	info, err := os.Stat(projectPath)
@@ -119,10 +126,10 @@ func (m *Manager) Exists(name string) bool {
 	return info.IsDir()
 }
 
-// Get obtiene información de un proyecto específico
+// Get retrieves metadata about a specific project by name.
 func (m *Manager) Get(name string) (*Project, error) {
 	if !m.Exists(name) {
-		return nil, fmt.Errorf("proyecto '%s' no encontrado", name)
+		return nil, fmt.Errorf("project '%s' not found", name)
 	}
 
 	projectPath := filepath.Join(m.baseDir, name)
@@ -139,63 +146,62 @@ func (m *Manager) Get(name string) (*Project, error) {
 	}, nil
 }
 
-// isGitRepo verifica si un directorio es un repositorio git
+// isGitRepo returns true if the given path contains a .git folder.
 func isGitRepo(path string) bool {
 	gitPath := filepath.Join(path, ".git")
 	info, err := os.Stat(gitPath)
 	return err == nil && info.IsDir()
 }
 
-// validateProjectName valida que el nombre sea válido
+// validateProjectName ensures the project name is safe and valid for use as a directory name.
 func validateProjectName(name string) error {
 	if name == "" {
-		return fmt.Errorf("el nombre del proyecto no puede estar vacío")
+		return fmt.Errorf("project name cannot be empty")
 	}
 
-	// Caracteres no permitidos en nombres de carpetas
 	invalidChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
 	for _, char := range invalidChars {
 		if strings.Contains(name, char) {
-			return fmt.Errorf("el nombre contiene caracteres no permitidos: %s", char)
+			return fmt.Errorf("project name contains invalid character: %s", char)
 		}
 	}
 
-	// No permitir nombres que empiecen con punto (carpetas ocultas)
 	if strings.HasPrefix(name, ".") {
-		return fmt.Errorf("el nombre no puede empezar con punto")
+		return fmt.Errorf("project name cannot start with a dot")
 	}
 
 	return nil
 }
 
-// initGitRepo inicializa un repositorio git y crea README
+// initGitRepo initializes a Git repository and generates a README.md file.
+//
+// It runs `git init`, creates a default README, adds it to the repository,
+// and performs an initial commit.
 func initGitRepo(projectPath, projectName string) error {
-	// Ejecutar git init
 	cmd := exec.Command("git", "init")
 	cmd.Dir = projectPath
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error ejecutando 'git init': %w", err)
+		return fmt.Errorf("failed running 'git init': %w", err)
 	}
 
-	// Crear README.md
+	// Generate README.md
 	readmePath := filepath.Join(projectPath, "README.md")
-	readmeContent := fmt.Sprintf("# %s\n\nProyecto creado con Project Manager CLI.\n", projectName)
+	readmeContent := fmt.Sprintf("# %s\n\nProject initialized using Project Manager CLI.\n", projectName)
 
 	if err := os.WriteFile(readmePath, []byte(readmeContent), 0644); err != nil {
-		return fmt.Errorf("error creando README.md: %w", err)
+		return fmt.Errorf("failed creating README.md: %w", err)
 	}
 
-	// Hacer commit inicial (opcional pero recomendado)
 	cmd = exec.Command("git", "add", "README.md")
 	cmd.Dir = projectPath
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error en 'git add': %w", err)
+		return fmt.Errorf("failed running 'git add': %w", err)
 	}
 
 	cmd = exec.Command("git", "commit", "-m", "Initial commit")
 	cmd.Dir = projectPath
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error en 'git commit': %w", err)
+		return fmt.Errorf("failed running 'git commit': %w", err)
 	}
 
 	return nil

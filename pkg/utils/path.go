@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ExpandPath expande ~ al directorio home del usuario
+// Expands the ~ dit to the full path /home/user/
 func ExpandPath(path string) string {
 	if strings.HasPrefix(path, "~/") {
 		homeDir, err := os.UserHomeDir()

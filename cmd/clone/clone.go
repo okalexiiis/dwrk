@@ -58,7 +58,7 @@ func runClone(cmd *cobra.Command, args []string) {
 
 	if url != "" {
 		repoURL = url
-		repoName = utils.ExtractRepoName(url)
+		repoName = utils.ExtractRepoNameFromURL(url)
 		fmt.Printf("🔗 Clonando desde URL: %s\n", repoURL)
 	} else {
 		if len(args) == 0 {

@@ -9,105 +9,109 @@ import (
 )
 
 const (
-	ConfigDirName  = ".config/dwrk"
+	// ConfigDirName defines the directory where the configuration file is stored.
+	ConfigDirName = ".config/dwrk"
+
+	// ConfigFileName is the filename of the main configuration file.
 	ConfigFileName = "config.yaml"
 )
 
-// Config estructura principal de configuración
+// Config represents the application's configuration structure.
 type Config struct {
-	ProjectsDir    string `yaml:"projects_dir"`
-	DefaultEditor  string `yaml:"default_editor"`
-	GitHubUsername string `yaml:"github_username"`
-	UseSSH         bool   `yaml:"use_ssh"`
+	ProjectsDir    string `yaml:"projects_dir"`    // Local directory where projects are stored.
+	DefaultEditor  string `yaml:"default_editor"`  // Preferred editor (auto, code, nvim, vim, etc.)
+	GitHubUsername string `yaml:"github_username"` // Associated GitHub username.
+	UseSSH         bool   `yaml:"use_ssh"`         // Controls whether GitHub operations use SSH.
 }
 
-// Default retorna la configuración por defecto
+// Default returns a new Config populated with default values.
 func Default() *Config {
 	homeDir, _ := os.UserHomeDir()
 	return &Config{
 		ProjectsDir:    filepath.Join(homeDir, "Projects"),
-		DefaultEditor:  "auto", // auto, code, nvim, vim, nano, terminal
+		DefaultEditor:  "auto",
 		GitHubUsername: "username",
 		UseSSH:         true,
 	}
 }
 
-// Load carga la configuración desde el archivo
+// Load loads the configuration from disk.
+// If the configuration file does not exist, a new one is created with default values.
 func Load() (*Config, error) {
 	configPath := GetConfigPath()
 
-	// Si no existe el archivo, crear con valores por defecto
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		cfg := Default()
 		if err := cfg.Save(); err != nil {
-			return nil, fmt.Errorf("error creando configuración por defecto: %w", err)
+			return nil, fmt.Errorf("failed to create default configuration: %w", err)
 		}
 		return cfg, nil
 	}
 
-	// Leer archivo
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("error leyendo configuración: %w", err)
+		return nil, fmt.Errorf("failed to read configuration: %w", err)
 	}
 
-	// Parsear YAML
 	cfg := &Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("error parseando configuración: %w", err)
+		return nil, fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
 	return cfg, nil
 }
 
-// Save guarda la configuración en el archivo
+// Save writes the current configuration to disk,
+// creating the configuration directory if needed.
 func (c *Config) Save() error {
 	configPath := GetConfigPath()
-
-	// Crear directorio si no existe
 	configDir := filepath.Dir(configPath)
+
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("error creando directorio de configuración: %w", err)
+		return fmt.Errorf("failed to create configuration directory: %w", err)
 	}
 
-	// Convertir a YAML
 	data, err := yaml.Marshal(c)
 	if err != nil {
-		return fmt.Errorf("error serializando configuración: %w", err)
+		return fmt.Errorf("failed to serialize configuration: %w", err)
 	}
 
-	// Escribir archivo
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("error escribiendo configuración: %w", err)
+		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 
 	return nil
 }
 
-// Set actualiza un valor de configuración
+// Set updates a configuration field by key and saves the result.
+// Expected keys: projects_dir, editor, github_username, use_ssh.
 func (c *Config) Set(key, value string) error {
 	switch key {
 	case "projects_dir":
-		// Expandir ~ si es necesario
-		if value[:2] == "~/" {
+		// Expand '~/' to the user's home directory.
+		if len(value) >= 2 && value[:2] == "~/" {
 			homeDir, _ := os.UserHomeDir()
 			value = filepath.Join(homeDir, value[2:])
 		}
 		c.ProjectsDir = value
+
 	case "editor", "default_editor":
 		c.DefaultEditor = value
+
 	case "github_username", "username":
 		c.GitHubUsername = value
+
 	case "use_ssh", "ssh":
 		c.UseSSH = value == "true" || value == "yes" || value == "1"
+
 	default:
-		return fmt.Errorf("clave de configuración no válida: %s", key)
+		return fmt.Errorf("invalid configuration key: %s", key)
 	}
 
 	return c.Save()
 }
 
-// Get obtiene un valor de configuración
+// Get retrieves the value of a configuration field by key.
 func (c *Config) Get(key string) (string, error) {
 	switch key {
 	case "projects_dir":
@@ -122,17 +126,17 @@ func (c *Config) Get(key string) (string, error) {
 		}
 		return "false", nil
 	default:
-		return "", fmt.Errorf("clave de configuración no válida: %s", key)
+		return "", fmt.Errorf("invalid configuration key: %s", key)
 	}
 }
 
-// GetConfigPath retorna la ruta del archivo de configuración
+// GetConfigPath returns the absolute path of the configuration file.
 func GetConfigPath() string {
 	homeDir, _ := os.UserHomeDir()
 	return filepath.Join(homeDir, ConfigDirName, ConfigFileName)
 }
 
-// Exists verifica si existe el archivo de configuración
+// Exists returns true if the configuration file exists.
 func Exists() bool {
 	configPath := GetConfigPath()
 	_, err := os.Stat(configPath)

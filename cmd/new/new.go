@@ -16,45 +16,49 @@ var (
 )
 
 var NewCmd = &cobra.Command{
-	Use:   "new <nombre>",
-	Short: "Crea un nuevo proyecto local",
-	Long:  "Crea un nuevo proyecto local en el directorio configurado, opcionalmente instancia un repositorio de git.",
-	Args:  cobra.ExactArgs(1), // Requiere exactamente un argumento (el nombre)
+	Use:   "new <name>",
+	Short: "Create a new local project",
+	Long:  "Creates a new local project in the configured directory and optionally initializes a Git repository.",
+	Args:  cobra.ExactArgs(1),
 	Run:   runNew,
 }
 
 func init() {
-	NewCmd.Flags().BoolVarP(&git, "git", "g", false, "Inicializar repositorio git")
+	NewCmd.Flags().BoolVarP(&git, "git", "g", false, "Initialize a Git repository")
 }
 
 func runNew(cmd *cobra.Command, args []string) {
-	// Load the config
+	// Load config
 	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
 
 	projectName := args[0]
 	projectsDir := utils.ExpandPath(cfg.ProjectsDir)
 
-	// Crear manager
+	// Create project manager
 	manager := project.NewManager(projectsDir)
 
-	// Intentar crear el proyecto
+	// Attempt to create the project
 	createdProject, err := manager.Create(projectName, project.CreateOptions{
 		InitGit: git,
 	})
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Mensaje de éxito
-	fmt.Printf("✅ Proyecto creado exitosamente: %s\n", createdProject.Name)
-	fmt.Printf("📁 Ubicación: %s\n", createdProject.Path)
+	// Success message
+	fmt.Printf("Project created successfully: %s\n", createdProject.Name)
+	fmt.Printf("Location: %s\n", createdProject.Path)
 
 	if createdProject.IsGit {
-		fmt.Println("🔗 Repositorio git inicializado")
+		fmt.Println("Git repository initialized")
 	}
 
-	fmt.Printf("\n💡 Para abrir el proyecto:\n")
-	fmt.Printf("   dwrk open %s\n", projectName)
+	fmt.Println("\nTo open the project:")
+	fmt.Printf("  dwrk open %s\n", projectName)
 }
