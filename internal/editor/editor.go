@@ -2,6 +2,8 @@ package editor
 
 import (
 	"fmt"
+
+	options "github.com/okalexiiis/dwrk/internal/editor/editors"
 )
 
 // Editor defines the behavior that all editors must implement.
@@ -21,13 +23,13 @@ func GetEditor(name string) (Editor, error) {
 
 	switch name {
 	case "code", "vscode":
-		ed = NewVSCode()
+		ed = options.NewVSCode()
 	case "nvim", "neovim":
-		ed = NewNeovim()
+		ed = options.NewNeovim()
 	case "vim":
-		ed = NewVim()
-	case "nano":
-		ed = NewNano()
+		ed = options.NewVim()
+	case "zed":
+		ed = options.NewZed()
 	default:
 		return nil, fmt.Errorf("unsupported editor: %s", name)
 	}
@@ -44,10 +46,10 @@ func GetEditor(name string) (Editor, error) {
 // If none are available, the system default editor ($EDITOR) is returned.
 func GetDefault() Editor {
 	editors := []Editor{
-		NewVSCode(),
-		NewNeovim(),
-		NewVim(),
-		NewNano(),
+		options.NewVSCode(),
+		options.NewNeovim(),
+		options.NewVim(),
+		options.NewZed(),
 	}
 
 	for _, ed := range editors {
@@ -57,5 +59,5 @@ func GetDefault() Editor {
 	}
 
 	// Fallback to the system editor when no known editors are available.
-	return NewSystemEditor()
+	return options.NewSystemEditor()
 }

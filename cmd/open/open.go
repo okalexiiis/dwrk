@@ -7,6 +7,7 @@ import (
 
 	"github.com/okalexiiis/dwrk/internal/config"
 	"github.com/okalexiiis/dwrk/internal/editor"
+	options "github.com/okalexiiis/dwrk/internal/editor/editors"
 	"github.com/okalexiiis/dwrk/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +56,7 @@ func runOpen(cmd *cobra.Command, args []string) {
 	}
 
 	if tmuxFlag {
-		selectedEditor := editor.NewTmux()
+		selectedEditor := options.NewTmux()
 		fmt.Printf("Opening '%s' with %s...\n", projectName, selectedEditor.Name())
 
 		if err := selectedEditor.Open(proj.Path); err != nil {
