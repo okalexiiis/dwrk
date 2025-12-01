@@ -129,6 +129,7 @@ func runList(cmd *cobra.Command, args []string) {
 	fmt.Println("Current configuration:")
 	fmt.Println()
 	fmt.Printf("  projects_dir:     %s\n", cfg.ProjectsDir)
+	fmt.Printf("  templates_dir:    %s\n", cfg.TemplatesDir)
 	fmt.Printf("  default_editor:   %s\n", cfg.DefaultEditor)
 	fmt.Printf("  github_username:  %s\n", cfg.GitHubUsername)
 	fmt.Printf("  use_ssh:          %v\n", cfg.UseSSH)

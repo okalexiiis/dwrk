@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/okalexiiis/dwrk/pkg/utils"
 )
 
 // Manager handles project discovery, creation, and metadata retrieval.
@@ -23,7 +25,8 @@ type ListOptions struct {
 
 // CreateOptions defines optional behaviors when creating a project.
 type CreateOptions struct {
-	InitGit bool // Initialize a Git repository after creating the folder
+	InitGit  bool   // Initialize a Git repository after creating the folder
+	Template string // Name of the template to use
 }
 
 // Project describes a project discovered or created by the Manager.
@@ -97,6 +100,15 @@ func (m *Manager) Create(name string, opts CreateOptions) (*Project, error) {
 	projectPath := filepath.Join(m.baseDir, name)
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// 2. Aplicar Plantilla (si se especificó)
+	if opts.Template != "" {
+		if err := m.applyTemplate(projectPath, name, opts.Template); err != nil {
+			// Es crucial limpiar si la aplicación de la plantilla falla
+			os.RemoveAll(projectPath)
+			return nil, fmt.Errorf("failed to apply template '%s': %w", opts.Template, err)
+		}
 	}
 
 	isGit := false
@@ -203,6 +215,41 @@ func initGitRepo(projectPath, projectName string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed running 'git commit': %w", err)
 	}
+
+	return nil
+}
+
+// applyTemplate locates the specified template, copies its contents to the destination
+// path, and optionally processes any variables within the template files.
+func (m *Manager) applyTemplate(destPath string, projectName string, templateName string) error {
+	// 1. Get the base path for all templates.
+	// NOTE: This TEMPLATES_BASE_DIR must be replaced with the actual location retrieved
+	// from your application's global configuration (e.g., cfg.TemplatesDir).
+	TEMPLATES_BASE_DIR := "/path/to/dwrk/templates" // Replace with the actual path from config
+
+	templatePath := filepath.Join(TEMPLATES_BASE_DIR, templateName)
+
+	// 2. Verify that the template directory exists.
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		return fmt.Errorf("template not found: '%s' (looked in %s)", templateName, templatePath)
+	} else if err != nil {
+		// Handles permissions issues or other file access errors
+		return fmt.Errorf("error checking template directory: %w", err)
+	}
+
+	fmt.Printf("Copying template '%s' content from %s to %s\n", templateName, templatePath, destPath)
+
+	// 3. Recursively copy the content from the template directory to the new project path.
+	// The CopyDir function must be implemented and available in the utils package.
+	if err := utils.CopyDir(templatePath, destPath); err != nil {
+		return fmt.Errorf("error copying template files: %w", err)
+	}
+
+	// 4. (Optional but Recommended) Process Variables / Template Engine Execution
+	// If you use a templating engine (like Go's text/template), this is where you would
+	// iterate over the copied files and execute the template logic, replacing placeholders
+	// like {{.ProjectName}} with the actual value (projectName).
+	// This step requires additional file traversal and template parsing logic.
 
 	return nil
 }

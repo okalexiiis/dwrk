@@ -12,7 +12,8 @@ import (
 
 // flags
 var (
-	git bool
+	git      bool
+	template string
 )
 
 var NewCmd = &cobra.Command{
@@ -25,6 +26,7 @@ var NewCmd = &cobra.Command{
 
 func init() {
 	NewCmd.Flags().BoolVarP(&git, "git", "g", false, "Initialize a Git repository")
+	NewCmd.Flags().StringVarP(&template, "template", "t", "", "Create a Project with a template")
 }
 
 func runNew(cmd *cobra.Command, args []string) {
@@ -43,7 +45,8 @@ func runNew(cmd *cobra.Command, args []string) {
 
 	// Attempt to create the project
 	createdProject, err := manager.Create(projectName, project.CreateOptions{
-		InitGit: git,
+		InitGit:  git,
+		Template: template,
 	})
 
 	if err != nil {

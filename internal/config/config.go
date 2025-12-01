@@ -19,6 +19,7 @@ const (
 // Config represents the application's configuration structure.
 type Config struct {
 	ProjectsDir    string `yaml:"projects_dir"`    // Local directory where projects are stored.
+	TemplatesDir   string `yaml:"templates_dir"`   // Local directiry where templates are stored.
 	DefaultEditor  string `yaml:"default_editor"`  // Preferred editor (auto, code, nvim, vim, etc.)
 	GitHubUsername string `yaml:"github_username"` // Associated GitHub username.
 	UseSSH         bool   `yaml:"use_ssh"`         // Controls whether GitHub operations use SSH.
@@ -29,6 +30,7 @@ func Default() *Config {
 	homeDir, _ := os.UserHomeDir()
 	return &Config{
 		ProjectsDir:    filepath.Join(homeDir, "Projects"),
+		TemplatesDir:   filepath.Join(homeDir, ".config/dwrk/templates"),
 		DefaultEditor:  "auto",
 		GitHubUsername: "username",
 		UseSSH:         true,
@@ -42,6 +44,7 @@ func Load() (*Config, error) {
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		cfg := Default()
+
 		if err := cfg.Save(); err != nil {
 			return nil, fmt.Errorf("failed to create default configuration: %w", err)
 		}
