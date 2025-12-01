@@ -64,4 +64,33 @@ dwrk clone portfolio-site
 
 
 #### To Do
-- [ ] Refactorize the code
+- [ ] Add a command to initialize dwrk config something like ```dwrk init```
+- [ ] The Command Add should add the project to a file where all the project configuration are.
+```yaml
+projects:
+  microservices-project:
+    path: ~/work/microservices-project
+    type: monorepo
+    template: microservices-base
+    created_at: 2024-01-15
+    
+    settings:
+      auto_merge: true
+      services_dir: services
+      compose_file: docker-compose.yml
+    
+    services:
+      - name: auth-service
+        template: go-grpc-clean
+        created_at: 2024-01-16
+      
+      - name: payments-service
+        template: express-microservice
+        created_at: 2024-01-17
+
+  auth-service-solo:
+    path: ~/personal/auth-service
+    type: standalone
+    template: express-microservice-template-3
+    created_at: 2024-01-10
+```
